@@ -24,6 +24,10 @@ static CONF: OnceCell<Configuration> = OnceCell::new();
 static ENV: OnceCell<Env> = OnceCell::new();
 static ASYNC_RT: Lazy<Option<Runtime>> = Lazy::new(Env::build_async_executor);
 
+// lazy_static::lazy_static!(
+// static ref ASYNC_RT: Option<Runtime> = Env::build_async_executor();
+// );
+
 pub(crate) static SHUFFLE_CACHE: Lazy<ShuffleCache> = Lazy::new(|| Arc::new(DashMap::new()));
 pub(crate) static BOUNDED_MEM_CACHE: Lazy<BoundedMemoryCache> = Lazy::new(BoundedMemoryCache::new);
 
@@ -45,9 +49,11 @@ impl Env {
         F: FnOnce() -> R,
     {
         if let Ok(rt) = Handle::try_current() {
-            rt.enter(func)
+            let _guard = rt.enter();
+            func()
         } else if let Some(rt) = &*ASYNC_RT {
-            rt.enter(func)
+            let _guard = rt.enter();
+            func()
         } else {
             unreachable!()
         }
@@ -62,9 +68,8 @@ impl Env {
             None
         } else {
             Some(
-                tokio::runtime::Builder::new()
+                tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
-                    .threaded_scheduler()
                     .build()
                     .unwrap(),
             )

@@ -9,11 +9,8 @@ use capnp_futures::serialize as capnp_serialize;
 use dashmap::{DashMap, DashSet};
 use parking_lot::Mutex;
 use thiserror::Error;
-use tokio::{
-    net::{TcpListener, TcpStream},
-    stream::StreamExt,
-};
-use tokio_util::compat::{Tokio02AsyncReadCompatExt, Tokio02AsyncWriteCompatExt};
+use tokio::net::{TcpListener, TcpStream};
+use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 const CAPNP_BUF_READ_OPTS: ReaderOptions = ReaderOptions {
     traversal_limit_in_words: std::u64::MAX,
@@ -100,11 +97,11 @@ impl MapOutputTracker {
         let master_addr = self.master_addr;
         let server_uris = self.server_uris.clone();
         tokio::spawn(async move {
-            let mut listener = TcpListener::bind(master_addr)
+            let listener = TcpListener::bind(master_addr)
                 .await
                 .map_err(NetworkError::TcpListener)?;
             log::debug!("map output tracker server started");
-            while let Some(Ok(mut stream)) = listener.incoming().next().await {
+            while let Ok((mut stream, _addr)) = listener.accept().await {
                 let server_uris_clone = server_uris.clone();
                 tokio::spawn(async move {
                     let (reader, writer) = stream.split();
@@ -128,7 +125,7 @@ impl MapOutputTracker {
                         == 0
                     {
                         //check whether this will hurt the performance or not
-                        tokio::time::delay_for(Duration::from_millis(1)).await;
+                        tokio::time::sleep(Duration::from_millis(1)).await;
                     }
                     let locs = server_uris_clone
                         .get(&shuffle_id)
@@ -227,7 +224,7 @@ impl MapOutputTracker {
             if self.fetching.contains(&shuffle_id) {
                 while self.fetching.contains(&shuffle_id) {
                     // TODO: check whether this will hurt the performance or not
-                    tokio::time::delay_for(Duration::from_millis(1)).await;
+                    tokio::time::sleep(Duration::from_millis(1)).await;
                 }
                 let servers = self
                     .server_uris

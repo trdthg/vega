@@ -11,15 +11,13 @@ use capnp::{
     serialize::OwnedSegments,
 };
 use capnp_futures::serialize as capnp_serialize;
-use crossbeam::{channel::bounded, Receiver, Sender};
+use crossbeam::channel::{bounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
 use tokio::{
     net::TcpListener,
-    stream::StreamExt,
     task::{spawn, spawn_blocking},
-    time::delay_for,
 };
-use tokio_util::compat::{Tokio02AsyncReadCompatExt, Tokio02AsyncWriteCompatExt};
+use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 const CAPNP_BUF_READ_OPTS: ReaderOptions = ReaderOptions {
     traversal_limit_in_words: std::u64::MAX,
@@ -57,10 +55,10 @@ impl Executor {
     #[allow(clippy::drop_copy)]
     async fn process_stream(self: Arc<Self>, rcv_main: Receiver<Signal>) -> Result<Signal> {
         let addr = SocketAddr::from(([0, 0, 0, 0], self.port));
-        let mut listener = TcpListener::bind(addr)
+        let listener = TcpListener::bind(addr)
             .await
             .map_err(NetworkError::TcpListener)?;
-        while let Some(Ok(mut stream)) = listener.incoming().next().await {
+        while let Ok((mut stream, _addr)) = listener.accept().await {
             let rcv_main = rcv_main.clone();
             let selfc = Arc::clone(&self);
             let res: Result<Signal> = spawn(async move {
@@ -175,11 +173,11 @@ impl Executor {
     async fn signal_handler(self: Arc<Self>, send_child: Sender<Signal>) -> Result<Signal> {
         let addr = SocketAddr::from(([0, 0, 0, 0], self.port + 10));
         log::debug!("signal handler port open @ {}", addr.port());
-        let mut listener = TcpListener::bind(addr)
+        let listener = TcpListener::bind(addr)
             .await
             .map_err(NetworkError::TcpListener)?;
         let mut signal: Result<Signal> = Err(Error::ExecutorShutdown);
-        while let Some(Ok(stream)) = listener.incoming().next().await {
+        while let Ok((stream, _addr)) = listener.accept().await {
             let stream = stream.compat();
             let signal_data = capnp_serialize::read_message(stream, CAPNP_BUF_READ_OPTS)
                 .await?
@@ -210,7 +208,7 @@ impl Executor {
             }
         }
         // give some time to the executor threads to shut down hopefully
-        delay_for(Duration::from_millis(1_000)).await;
+        tokio::time::sleep(Duration::from_millis(1_000)).await;
         signal
     }
 }

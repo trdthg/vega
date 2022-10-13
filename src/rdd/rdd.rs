@@ -220,7 +220,10 @@ pub trait Rdd: RddBase + 'static {
     {
         let ignore_idx = Fn!(move |_index: usize,
                                    items: Box<dyn Iterator<Item = Self::Item>>|
-              -> Box<dyn Iterator<Item = _>> { (func)(items) });
+              -> Box<dyn Iterator<Item = _>> {
+            //
+            (func)(items)
+        });
         SerArc::new(MapPartitionsRdd::new(self.get_rdd(), ignore_idx))
     }
 
@@ -438,8 +441,10 @@ pub trait Rdd: RddBase + 'static {
         Self: Sized,
     {
         let context = self.get_context();
-        let counting_func =
-            Fn!(|iter: Box<dyn Iterator<Item = Self::Item>>| { iter.count() as u64 });
+        let counting_func = Fn!(|iter: Box<dyn Iterator<Item = Self::Item>>| {
+            //
+            iter.count() as u64
+        });
         Ok(context
             .run_job(self.get_rdd(), counting_func)?
             .into_iter()
@@ -631,11 +636,13 @@ pub trait Rdd: RddBase + 'static {
         let sum: f64 = weights.iter().sum();
         assert!(
             weights.iter().all(|&x| x >= 0.0),
-            format!("Weights must be nonnegative, but got {:?}", weights)
+            "Weights must be nonnegative, but got {:?}",
+            weights
         );
         assert!(
             sum > 0.0,
-            format!("Sum of weights must be positive, but got {:?}", weights)
+            "Sum of weights must be positive, but got {:?}",
+            weights
         );
 
         let seed_val: u64 = seed.unwrap_or(rand::random::<u64>());
@@ -1042,11 +1049,13 @@ pub trait Rdd: RddBase + 'static {
         };
         assert!(0.0 <= confidence && confidence <= 1.0);
 
-        let count_elements = Fn!(|(_ctx, iter): (
-            TaskContext,
-            Box<dyn Iterator<Item = Self::Item>>
-        )|
-         -> usize { iter.count() });
+        let count_elements =
+            Fn!(
+                |(_ctx, iter): (TaskContext, Box<dyn Iterator<Item = Self::Item>>)| -> usize {
+                    //
+                    iter.count()
+                }
+            );
 
         let evaluator = CountEvaluator::new(self.number_of_splits(), confidence);
         let rdd = self.get_rdd();

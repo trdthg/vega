@@ -140,7 +140,7 @@ impl ShuffleFetcher {
 mod tests {
     use super::*;
 
-    #[tokio::test(core_threads = 4)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn fetch_ok() -> StdResult<(), Box<dyn std::error::Error + 'static>> {
         {
             let addr = format!(
@@ -165,7 +165,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(core_threads = 4)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn fetch_failure() -> StdResult<(), Box<dyn std::error::Error + 'static>> {
         {
             let addr = format!(

@@ -16,8 +16,8 @@ use capnp::message::ReaderOptions;
 use capnp_futures::serialize as capnp_serialize;
 use dashmap::{DashMap, DashSet};
 use serde_derive::{Deserialize, Serialize};
-use tokio::{net::TcpListener, stream::StreamExt};
-use tokio_util::compat::{Tokio02AsyncReadCompatExt, Tokio02AsyncWriteCompatExt};
+use tokio::net::TcpListener;
+use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 const CAPNP_BUF_READ_OPTS: ReaderOptions = ReaderOptions {
     traversal_limit_in_words: std::u64::MAX,
@@ -144,11 +144,11 @@ impl CacheTracker {
         }
         log::debug!("cache tracker server starting");
         tokio::spawn(async move {
-            let mut listener = TcpListener::bind(self.master_addr)
+            let listener = TcpListener::bind(self.master_addr)
                 .await
                 .map_err(NetworkError::TcpListener)?;
             log::debug!("cache tracker server started");
-            while let Some(Ok(mut stream)) = listener.incoming().next().await {
+            while let Ok((mut stream, _addr)) = listener.accept().await {
                 let selfc = Arc::clone(&self);
                 tokio::spawn(async move {
                     let (reader, writer) = stream.split();
