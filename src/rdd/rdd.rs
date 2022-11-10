@@ -445,10 +445,9 @@ pub trait Rdd: RddBase + 'static {
             //
             iter.count() as u64
         });
-        Ok(context
-            .run_job(self.get_rdd(), counting_func)?
-            .into_iter()
-            .sum())
+        let a = context.run_job(self.get_rdd(), counting_func)?;
+        let res = a.into_iter().sum();
+        Ok(res)
     }
 
     /// Return the count of each unique value in this RDD as a dictionary of (value, count) pairs.
